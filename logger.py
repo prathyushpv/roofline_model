@@ -1,9 +1,13 @@
 import logging
 import sys
+from datetime import datetime
 
-def create_logger(filename):
+def create_logger(filename = None):
+    if filename is None:
+        now = datetime.now()
+        filename = "log_" + now.strftime("%m_%d_%Y__%H_%M_%S")
     try:
-        logger = logging.getLogger(filename)
+        logger = logging.getLogger("main_log")
     except OSError:
         pass
     logger.setLevel(logging.DEBUG)

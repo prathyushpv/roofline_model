@@ -3,6 +3,8 @@ from logger import create_logger
 from datetime import datetime
 import sys
 from collections import OrderedDict 
+from timeit import default_timer as timer
+from logging import getLogger
 
 class ReturnException(Exception):
     def __init__(self, return_value):
@@ -44,13 +46,14 @@ class Perf:
         self.counters = counters
         self.command = command
         self.repeat_factor = 5
-        logname = "perf_{time}.log"
-        now = datetime.now()
-        logname = logname.format(time = now.strftime("%m_%d_%Y__%H_%M_%S"))
-        if log_handle is None:
-            self.logger = create_logger(logname)
-        else:
-            self.logger = log_handle
+        # logname = "perf_{time}.log"
+        # now = datetime.now()
+        # logname = logname.format(time = now.strftime("%m_%d_%Y__%H_%M_%S"))
+        # if log_handle is None:
+        #     self.logger = create_logger(logname)
+        # else:
+        #     self.logger = log_handle
+        self.logger = getLogger("main_log")
 
     def set_counters(self, counters):
         self.counters = counters
@@ -69,11 +72,13 @@ class Perf:
         result = OrderedDict()
 
         while counters_to_measure:
-            perf_command = ["perf", "stat", "-x", ";", "-r", "5", "-e",
+            perf_command = ["perf", "stat", "-x", ";", "-r", str(self.repeat_factor), "-e",
                             ",".join(counters_to_measure)]
 
-            perf_command.extend(self.command.split())
+            perf_command.extend(self.command.split(" "))
+            start = timer()
             return_value, output = run_command(perf_command, self.logger)
+            end = timer()
             if return_value != 0:
                 return None
             output = output.split("\n")
@@ -90,7 +95,10 @@ class Perf:
                             value = int(value.replace(",", ""))
                             counters_to_measure.remove(key)
                         result[key] = value
+            result["time"] = float(end - start) / self.repeat_factor
         return result
+
+        
 if __name__ == "__main__":
     p = Perf([  'L1-dcache-load-misses', 
                 'LLC-load-misses',
