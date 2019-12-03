@@ -56,6 +56,10 @@ class Roofline:
                     'L1-dcache-stores', 
                     'LLC-load-misses', 
                     'LLC-store-misses',
+                    'fp_arith_inst_retired.128b_packed_double',
+                    'fp_arith_inst_retired.128b_packed_single',
+                    'fp_arith_inst_retired.256b_packed_double',
+                    'fp_arith_inst_retired.256b_packed_single'
                     ]
 
         for prereq in self.prereqs:
@@ -82,9 +86,9 @@ class Roofline:
                                 workload["fp_arith_inst_retired.256b_packed_double"] * 4 + \
                                 workload["fp_arith_inst_retired.256b_packed_single"] * 8
             non_simd_operations = operations -  workload["fp_arith_inst_retired.128b_packed_double"] - \
-                                                workload["fp_arith_inst_retired.128b_packed_double"] - \
-                                                workload["fp_arith_inst_retired.128b_packed_double"] - \
-                                                workload["fp_arith_inst_retired.128b_packed_double"]
+                                                workload["fp_arith_inst_retired.128b_packed_single"] - \
+                                                workload["fp_arith_inst_retired.256b_packed_double"] - \
+                                                workload["fp_arith_inst_retired.256b_packed_single"]
 
             effective_operations = simd_operations + non_simd_operations
 
@@ -117,3 +121,15 @@ class Roofline:
     def show(self):
         plt.show()
     
+"""
+logger = create_logger()
+r = Roofline(64, 15)
+# r.add_data("data.json")
+r.add_prereq("ls -ltr")
+r.add_command("/home/prathyushpv/work/High_Performance_GEMM/mmm", "mmm")
+# r.add_command("/home/prathyushpv/work/High_Performance_GEMM/mmm", "mmm")
+r.run()
+r.dump_data()
+r.plot_workloads()
+r.show()
+"""
