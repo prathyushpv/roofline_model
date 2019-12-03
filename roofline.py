@@ -94,7 +94,7 @@ class Roofline:
 
                               
             data_transfer = (workload["LLC-load-misses"] + workload["LLC-store-misses"]) * 64
-
+            workload["effective_operations"] = effective_operations
             workload["operational_intensity"] = float(effective_operations) / float(data_transfer)
             workload["gflops"] = (effective_operations / float(workload["time"]))/1000000000
             
