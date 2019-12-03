@@ -75,6 +75,26 @@ class Roofline:
                 result["name"] = name
             self.data.append(result)
 
+        for workload in self.data:
+            operations = workload["instructions"] - workload["L1-dcache-loads"] - workload["L1-dcache-stores"]
+            simd_operations =   workload["fp_arith_inst_retired.128b_packed_double"] * 2 + \
+                                workload["fp_arith_inst_retired.128b_packed_single"] * 4 + \
+                                workload["fp_arith_inst_retired.256b_packed_double"] * 4 + \
+                                workload["fp_arith_inst_retired.256b_packed_single"] * 8
+            non_simd_operations = operations -  workload["fp_arith_inst_retired.128b_packed_double"] - \
+                                                workload["fp_arith_inst_retired.128b_packed_double"] - \
+                                                workload["fp_arith_inst_retired.128b_packed_double"] - \
+                                                workload["fp_arith_inst_retired.128b_packed_double"]
+
+            effective_operations = simd_operations + non_simd_operations
+
+                              
+            data_transfer = (workload["LLC-load-misses"] + workload["LLC-store-misses"]) * 64
+
+            workload["operational_intensity"] = float(effective_operations) / float(data_transfer)
+            workload["gflops"] = (effective_operations / float(workload["time"]))/1000000000
+            
+
     def add_data(self, filename):
         with open(filename) as fp:
             self.data = json.load(fp)
@@ -88,16 +108,9 @@ class Roofline:
     def plot_workloads(self):
         for workload in self.data:
             name = workload["name"]
-
-            operations = workload["instructions"] - workload["L1-dcache-loads"] - workload["L1-dcache-stores"] 
-            data_transfer = (workload["LLC-load-misses"] + workload["LLC-store-misses"]) * 64
-            operational_intensity = float(operations) / float(data_transfer)
-
-            gflops = (operations / float(workload["time"]))/1000000000
-            print (name, operational_intensity, gflops)
-            print json.dumps(workload)
-            self.ax.plot(operational_intensity, gflops, "bo")
-            self.ax.annotate(name, (operational_intensity, gflops))
+            print (name, workload["operational_intensity"], workload["gflops"])
+            self.ax.plot(workload["operational_intensity"], workload["gflops"], "bo")
+            self.ax.annotate(name, (workload["operational_intensity"], workload["gflops"]))
 
 
 
@@ -105,13 +118,13 @@ class Roofline:
         plt.show()
     
 
-# logger = create_logger()
-# r = Roofline(64, 15)
+logger = create_logger()
+r = Roofline(64, 15)
 # r.add_data("data.json")
-# r.add_prereq("ls -ltr")
+r.add_prereq("ls -ltr")
+r.add_command("/home/prathyushpv/work/High_Performance_GEMM/mmm", "mmm")
 # r.add_command("/home/prathyushpv/work/High_Performance_GEMM/mmm", "mmm")
-# # r.add_command("/home/prathyushpv/work/High_Performance_GEMM/mmm", "mmm")
-# r.run()
-# r.dump_data()
-# r.plot_workloads()
-# r.show()
+r.run()
+r.dump_data()
+r.plot_workloads()
+r.show()
