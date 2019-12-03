@@ -117,14 +117,3 @@ class Roofline:
     def show(self):
         plt.show()
     
-
-logger = create_logger()
-r = Roofline(64, 15)
-# r.add_data("data.json")
-r.add_prereq("ls -ltr")
-r.add_command("/home/prathyushpv/work/High_Performance_GEMM/mmm", "mmm")
-# r.add_command("/home/prathyushpv/work/High_Performance_GEMM/mmm", "mmm")
-r.run()
-r.dump_data()
-r.plot_workloads()
-r.show()
