@@ -81,16 +81,16 @@ class Roofline:
 
         for workload in self.data:
             operations = workload["instructions"] - workload["L1-dcache-loads"] - workload["L1-dcache-stores"]
-            simd_operations =   workload["fp_arith_inst_retired.128b_packed_double"] * 2 + \
-                                workload["fp_arith_inst_retired.128b_packed_single"] * 4 + \
-                                workload["fp_arith_inst_retired.256b_packed_double"] * 4 + \
-                                workload["fp_arith_inst_retired.256b_packed_single"] * 8
-            non_simd_operations = operations -  workload["fp_arith_inst_retired.128b_packed_double"] - \
-                                                workload["fp_arith_inst_retired.128b_packed_single"] - \
-                                                workload["fp_arith_inst_retired.256b_packed_double"] - \
-                                                workload["fp_arith_inst_retired.256b_packed_single"]
+            simd_operations =   workload["fp_arith_inst_retired.128b_packed_double"] + \
+                                workload["fp_arith_inst_retired.128b_packed_single"] + \
+                                workload["fp_arith_inst_retired.256b_packed_double"] + \
+                                workload["fp_arith_inst_retired.256b_packed_single"]
+            """non_simd_operations = operations -  workload["fp_arith_inst_retired.128b_packed_double"] / 2 - \
+                                                workload["fp_arith_inst_retired.128b_packed_single"] / 4 - \
+                                                workload["fp_arith_inst_retired.256b_packed_double"] / 4 - \
+                                                workload["fp_arith_inst_retired.256b_packed_single"] / 8"""
 
-            effective_operations = simd_operations + non_simd_operations
+            effective_operations = simd_operations + operations
 
                               
             data_transfer = (workload["LLC-load-misses"] + workload["LLC-store-misses"]) * 64
