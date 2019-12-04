@@ -51,9 +51,9 @@ class Roofline:
         self.prereqs.append(command)
 
     def run(self):
-        counters = ['instructions', 
-                    'L1-dcache-loads', 
-                    'L1-dcache-stores', 
+        counters = ['inst_retired.any', 
+                    'mem_inst_retired.all_loads', 
+                    'mem_inst_retired.all_stores', 
                     'LLC-load-misses', 
                     'LLC-store-misses',
                     'fp_arith_inst_retired.128b_packed_double',
@@ -79,24 +79,6 @@ class Roofline:
                 result["name"] = name
             self.data.append(result)
 
-        for workload in self.data:
-            operations = workload["instructions"] - workload["L1-dcache-loads"] - workload["L1-dcache-stores"]
-            simd_operations =   workload["fp_arith_inst_retired.128b_packed_double"] + \
-                                workload["fp_arith_inst_retired.128b_packed_single"] + \
-                                workload["fp_arith_inst_retired.256b_packed_double"] + \
-                                workload["fp_arith_inst_retired.256b_packed_single"]
-            """non_simd_operations = operations -  workload["fp_arith_inst_retired.128b_packed_double"] / 2 - \
-                                                workload["fp_arith_inst_retired.128b_packed_single"] / 4 - \
-                                                workload["fp_arith_inst_retired.256b_packed_double"] / 4 - \
-                                                workload["fp_arith_inst_retired.256b_packed_single"] / 8"""
-
-            effective_operations = simd_operations + operations
-
-                              
-            data_transfer = (workload["LLC-load-misses"] + workload["LLC-store-misses"]) * 64
-            workload["effective_operations"] = effective_operations
-            workload["operational_intensity"] = float(effective_operations) / float(data_transfer)
-            workload["gflops"] = (effective_operations / float(workload["time"]))/1000000000
             
 
     def add_data(self, filename):
@@ -110,6 +92,27 @@ class Roofline:
              json.dump(self.data, fp, indent=4)
 
     def plot_workloads(self):
+        for workload in self.data:
+            operations = workload["inst_retired.any"] - workload["mem_inst_retired.all_loads"] - workload["mem_inst_retired.all_stores"]
+            simd_operations =   workload["fp_arith_inst_retired.128b_packed_double"] * 2 + \
+                                workload["fp_arith_inst_retired.128b_packed_single"] * 4 + \
+                                workload["fp_arith_inst_retired.256b_packed_double"] * 4 + \
+                                workload["fp_arith_inst_retired.256b_packed_single"] * 8
+            non_simd_operations = operations -  workload["fp_arith_inst_retired.128b_packed_double"] - \
+                                                workload["fp_arith_inst_retired.128b_packed_single"] - \
+                                                workload["fp_arith_inst_retired.256b_packed_double"] - \
+                                                workload["fp_arith_inst_retired.256b_packed_single"]
+
+            effective_operations = simd_operations + non_simd_operations
+
+                              
+            data_transfer = (workload["LLC-load-misses"] + workload["LLC-store-misses"]) * 64
+            workload["effective_operations"] = effective_operations
+            print simd_operations
+            print operations
+            print effective_operations
+            workload["operational_intensity"] = float(effective_operations) / float(data_transfer)
+            workload["gflops"] = (effective_operations / float(workload["time"]))/1000000000
         for workload in self.data:
             name = workload["name"]
             print (name, workload["operational_intensity"], workload["gflops"])
@@ -129,7 +132,8 @@ r.add_prereq("ls -ltr")
 r.add_command("/home/prathyushpv/work/High_Performance_GEMM/mmm", "mmm")
 # r.add_command("/home/prathyushpv/work/High_Performance_GEMM/mmm", "mmm")
 r.run()
-r.dump_data()
 r.plot_workloads()
+r.dump_data()
 r.show()
+
 """
