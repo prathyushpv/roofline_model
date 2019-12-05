@@ -50,10 +50,13 @@ class Roofline:
     def add_prereq(self, command):
         self.prereqs.append(command)
 
-    def run(self):
+    def run(self, phased=False):
         counters = ['inst_retired.any', 
+                    'instructions',
                     'mem_inst_retired.all_loads', 
                     'mem_inst_retired.all_stores', 
+                    'L1-dcache-loads',
+                    'L1-dcache-stores',
                     'LLC-load-misses', 
                     'LLC-store-misses',
                     'fp_arith_inst_retired.128b_packed_double',
@@ -74,10 +77,14 @@ class Roofline:
             p.set_command(command)
             p.set_counters(counters)
             p.set_repeat_factor(1)
-            result = p.run()
-            if result is not None:
-                result["name"] = name
-            self.data.append(result)
+            if phased:
+                result = p.run_phased()
+                self.data.extend(result)
+            else:
+                result = p.run()
+                if result is not None:
+                   result["name"] = name
+                self.data.append(result)
 
             
 
@@ -93,7 +100,7 @@ class Roofline:
 
     def plot_workloads(self):
         for workload in self.data:
-            operations = workload["inst_retired.any"] - workload["mem_inst_retired.all_loads"] - workload["mem_inst_retired.all_stores"]
+            operations = workload["instructions"] - workload["L1-dcache-loads"] - workload["L1-dcache-stores"]
             simd_operations =   workload["fp_arith_inst_retired.128b_packed_double"] * 2 + \
                                 workload["fp_arith_inst_retired.128b_packed_single"] * 4 + \
                                 workload["fp_arith_inst_retired.256b_packed_double"] * 4 + \
@@ -108,11 +115,15 @@ class Roofline:
                               
             data_transfer = (workload["LLC-load-misses"] + workload["LLC-store-misses"]) * 64
             workload["effective_operations"] = effective_operations
+            print workload["inst_retired.any"]
+            print workload["L1-dcache-loads"]
+            print workload["L1-dcache-stores"]
+            print "\n"
             print simd_operations
             print operations
             print effective_operations
             workload["operational_intensity"] = float(effective_operations) / float(data_transfer)
-            workload["gflops"] = (effective_operations / float(workload["time"]))/1000000000
+            workload["gflops"] = (effective_operations / workload["time"])/1000000000
         for workload in self.data:
             name = workload["name"]
             print (name, workload["operational_intensity"], workload["gflops"])
@@ -127,13 +138,13 @@ class Roofline:
 """
 logger = create_logger()
 r = Roofline(64, 15)
-# r.add_data("data.json")
-r.add_prereq("ls -ltr")
-r.add_command("/home/prathyushpv/work/High_Performance_GEMM/mmm", "mmm")
-# r.add_command("/home/prathyushpv/work/High_Performance_GEMM/mmm", "mmm")
-r.run()
-r.plot_workloads()
+#r.add_data("data3.json")
+#r.add_command("/home/prathyushpv/work/High_Performance_GEMM/mmm", "mmm")
+#r.run()
+#r.plot_workloads()
+#r.dump_data()
+#r.show()
+r.add_command("python test.py", "test")
+r.run(True)
 r.dump_data()
-r.show()
-
 """

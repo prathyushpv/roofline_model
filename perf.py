@@ -5,7 +5,10 @@ import sys
 from collections import OrderedDict 
 from timeit import default_timer as timer
 from logging import getLogger
-
+from glob import glob
+from time import sleep
+from threading import Thread
+import os 
 class ReturnException(Exception):
     def __init__(self, return_value):
         self.return_value = return_value
@@ -42,7 +45,7 @@ class Perf:
     """
         Class to measure performance counters using the perf command in linux
     """
-    def __init__(self, counters=None, command=None, log_handle=None):
+    def __init__(self, counters=None, command=None, name=None, log_handle=None):
         self.counters = counters
         self.command = command
         self.repeat_factor = 5
@@ -54,6 +57,8 @@ class Perf:
         # else:
         #     self.logger = log_handle
         self.logger = getLogger("main_log")
+        self.name = name
+        self.phase_dir = "phases"
 
     def set_counters(self, counters):
         self.counters = counters
@@ -97,6 +102,83 @@ class Perf:
                         result[key] = value
             result["time"] = float(end - start) / self.repeat_factor
         return result
+    
+    def poll_output(self, process):
+        for stdout_line in iter(process.stdout.readline, ""):
+            self.logger.debug(stdout_line)
+        for stderr_line in iter(process.stderr.readline, ""):
+            self.logger.debug(stderr_line)
+        
+    def parse_output(self, output, phase_name):
+        output = output.split("\n")
+        result = OrderedDict()
+        for counter in self.counters:
+            for line in output:
+                if counter in line:
+                    fields = line.split(";")
+                    value = fields[0]
+                    key = fields[2]
+                    if "<not counted>" in value:
+                        self.logger.info("Counter %s is not counted " % key)
+                    else:
+                        value = int(value.replace(",", ""))
+                    result[key] = value
+        #result["time"] = float(end - start) / self.repeat_factor
+        result["name"] = self.name
+        result["phase"] = phase_name
+        return result
+        
+    def set_phase_dir(self, directory):
+        self.phase_dir = directory
+        
+    def get_phase_counters(self, cmd):
+        while cmd.poll() is None:
+            self.logger.info("Checking file")
+            while cmd.poll() is None and not glob(self.phase_dir+"/*"):
+                pass#sleep(1)
+            if cmd.poll() is not None:
+                break
+            self.logger.info("File found")
+            phase_name = glob(self.phase_dir+"/*")[0]
+            self.logger.info(phase_name)
+            cmd_start_perf = ["perf", "stat" ,"-x", ";", "-e", 
+                              ",".join(self.counters), "-p", "2140"]
+            print " ".join(cmd_start_perf) 
+
+            perf = subprocess.Popen(cmd_start_perf, stdout=subprocess.PIPE, 
+                                    stderr=subprocess.PIPE)
+                                    
+                               
+            while cmd.poll() is None and glob(phase_name):
+                pass#sleep(1)
+            if cmd.poll() is not None:
+                break
+            self.logger.info("File deleted")
+                
+            #perf.kill()
+            os.system("pkill -2 perf")
+            perf.wait()
+            perf_out = perf.stdout.read()
+            perf_out =perf_out + perf.stderr.read()
+            print perf_out
+            self.result.append(self.parse_output(perf_out, phase_name))
+        
+        
+    def run_phased(self):
+        self.result = []
+        self.logger.info("Executing phases")
+        cmd = subprocess.Popen(self.command.split(" "), stdout=subprocess.PIPE, 
+                                 stderr=subprocess.PIPE, 
+                                 universal_newlines=True, bufsize=1)
+        
+        #poll = Thread(target=self.poll_output, args=(cmd,))
+        #poll.start()
+        self.get_phase_counters(cmd)
+        return self.result
+
+        
+        
+        
 
         
 if __name__ == "__main__":
