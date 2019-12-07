@@ -63,7 +63,7 @@ class Roofline:
                     'fp_arith_inst_retired.128b_packed_single',
                     'fp_arith_inst_retired.256b_packed_double',
                     'fp_arith_inst_retired.256b_packed_single'
-                    ]
+                   ]
 
         for prereq in self.prereqs:
             self.logger.info("Running prereq %s" % prereq)
@@ -79,6 +79,8 @@ class Roofline:
             p.set_repeat_factor(1)
             if phased:
                 result = p.run_phased()
+                for res in result:
+                    res["name"] = name
                 self.data.extend(result)
             else:
                 result = p.run()
@@ -134,17 +136,17 @@ class Roofline:
 
     def show(self):
         plt.show()
-    
-"""
-logger = create_logger()
-r = Roofline(64, 15)
-#r.add_data("data3.json")
-#r.add_command("/home/prathyushpv/work/High_Performance_GEMM/mmm", "mmm")
-#r.run()
-#r.plot_workloads()
-#r.dump_data()
-#r.show()
-r.add_command("python test.py", "test")
-r.run(True)
-r.dump_data()
-"""
+
+if __name__ == "__main__":
+    logger = create_logger()
+    r = Roofline(64, 15)
+    #r.add_data("data3.json")
+    #r.add_command("/home/prathyushpv/work/High_Performance_GEMM/mmm", "mmm")
+    #r.run()
+    #r.plot_workloads()
+    #r.dump_data()
+    #r.show()
+    r.add_command("python test.py", "test")
+    r.run(True)
+    r.dump_data()
+

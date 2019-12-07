@@ -9,6 +9,7 @@ from glob import glob
 from time import sleep
 from threading import Thread
 import os 
+import json 
 class ReturnException(Exception):
     def __init__(self, return_value):
         self.return_value = return_value
@@ -104,10 +105,12 @@ class Perf:
         return result
     
     def poll_output(self, process):
+        print "Printing the lines"
         for stdout_line in iter(process.stdout.readline, ""):
-            self.logger.debug(stdout_line)
+           self.logger.debug(stdout_line.rstrip())
         for stderr_line in iter(process.stderr.readline, ""):
-            self.logger.debug(stderr_line)
+           self.logger.debug(stderr_line.rstrip())
+        
         
     def parse_output(self, output, phase_name):
         output = output.split("\n")
@@ -132,49 +135,84 @@ class Perf:
         self.phase_dir = directory
         
     def get_phase_counters(self, cmd):
+        total_phases = 0
+        not_counted = False
         while cmd.poll() is None:
             self.logger.info("Checking file")
             while cmd.poll() is None and not glob(self.phase_dir+"/*"):
-                pass#sleep(1)
+                sleep(1)
             if cmd.poll() is not None:
                 break
-            self.logger.info("File found")
+            total_phases += 1
+            
             phase_name = glob(self.phase_dir+"/*")[0]
-            self.logger.info(phase_name)
+            result = None
+            if phase_name in self.result.keys():
+                result = self.result[phase_name]
+            else:
+                result = OrderedDict()
+                
+            counters_left = [item for item in self.counters if item not in result.keys()]
+            self.logger.info("File found")
+            self.logger.info("Coutners measured are " + ",".join(result.keys()))
+            self.logger.info("Measuring counters for the phase :" + phase_name)
+            self.logger.info("counters left to measure are : " + ",".join(counters_left))
             cmd_start_perf = ["perf", "stat" ,"-x", ";", "-e", 
-                              ",".join(self.counters), "-p", "2140"]
+                              ",".join(counters_left), "-p", str(cmd.pid)]
             print " ".join(cmd_start_perf) 
 
             perf = subprocess.Popen(cmd_start_perf, stdout=subprocess.PIPE, 
                                     stderr=subprocess.PIPE)
                                     
-                               
             while cmd.poll() is None and glob(phase_name):
-                pass#sleep(1)
-            if cmd.poll() is not None:
-                break
+                sleep(1)
+            #if cmd.poll() is not None:
+            #    break
             self.logger.info("File deleted")
                 
             #perf.kill()
             os.system("pkill -2 perf")
             perf.wait()
-            perf_out = perf.stdout.read()
-            perf_out =perf_out + perf.stderr.read()
-            print perf_out
-            self.result.append(self.parse_output(perf_out, phase_name))
+            output = perf.stdout.read() + perf.stderr.read()
+            print output
+            output = output.split("\n")
+            
+            for counter in counters_left:
+                for line in output:
+                    if counter in line:
+                        fields = line.split(";")
+                        value = fields[0]
+                        key = fields[2]
+                        if "<not counted>" in line:
+                            self.logger.info("Counter %s is not counted " % key)
+                            not_counted = True
+                            #result[key] = 0
+                        else:
+                            value = int(value.replace(",", ""))
+                            result[key] = value
+            #result["time"] = float(end - start) / self.repeat_factor
+            result["name"] = self.name
+            result["phase"] = phase_name
+            self.result[phase_name] = result
+            #self.result.append(self.parse_output(perf_out, phase_name))
+        print json.dumps(self.result, indent=4)
+        return not_counted
+
         
         
     def run_phased(self):
-        self.result = []
-        self.logger.info("Executing phases")
-        cmd = subprocess.Popen(self.command.split(" "), stdout=subprocess.PIPE, 
-                                 stderr=subprocess.PIPE, 
-                                 universal_newlines=True, bufsize=1)
-        
-        #poll = Thread(target=self.poll_output, args=(cmd,))
-        #poll.start()
-        self.get_phase_counters(cmd)
-        return self.result
+        self.result = {}
+        not_counted = True
+        while not_counted:
+            self.logger.info("Executing phases")
+            cmd = subprocess.Popen(self.command.split(" "), stdout=subprocess.PIPE, 
+                                     stderr=subprocess.PIPE, 
+                                     universal_newlines=True, bufsize=1)    
+            poll = Thread(target=self.poll_output, args=(cmd,))
+            poll.start()
+            not_counted = self.get_phase_counters(cmd)
+            cmd.wait()
+        return self.result.values()
 
         
         
