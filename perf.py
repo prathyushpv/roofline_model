@@ -166,14 +166,13 @@ class Perf:
             start = timer()
             perf = subprocess.Popen(cmd_start_perf, stdout=subprocess.PIPE, 
                                     stderr=subprocess.PIPE)
-            end = timer()
                                     
             while cmd.poll() is None and glob(phase_name):
                 sleep(1)
             #if cmd.poll() is not None:
             #    break
             self.logger.info("File deleted")
-                
+            end = timer()
             #perf.kill()
             os.system("pkill -2 perf")
             perf.wait()
