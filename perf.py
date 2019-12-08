@@ -146,6 +146,9 @@ class Perf:
             total_phases += 1
             
             phase_name = glob(self.phase_dir+"/*")[0]
+            pid = open(phase_name,"r").read().strip()
+            if not pid:
+               pid = cmd.pid
             result = None
             if phase_name in self.result.keys():
                 result = self.result[phase_name]
@@ -158,11 +161,12 @@ class Perf:
             self.logger.info("Measuring counters for the phase :" + phase_name)
             self.logger.info("counters left to measure are : " + ",".join(counters_left))
             cmd_start_perf = ["perf", "stat" ,"-x", ";", "-e", 
-                              ",".join(counters_left), "-p", str(cmd.pid)]
+                              ",".join(counters_left), "-p", str(pid)]
             print " ".join(cmd_start_perf) 
-
+            start = timer()
             perf = subprocess.Popen(cmd_start_perf, stdout=subprocess.PIPE, 
                                     stderr=subprocess.PIPE)
+            end = timer()
                                     
             while cmd.poll() is None and glob(phase_name):
                 sleep(1)
@@ -193,6 +197,7 @@ class Perf:
             #result["time"] = float(end - start) / self.repeat_factor
             result["name"] = self.name
             result["phase"] = phase_name
+            result["time"] = float(end - start)
             self.result[phase_name] = result
             #self.result.append(self.parse_output(perf_out, phase_name))
         print json.dumps(self.result, indent=4)
