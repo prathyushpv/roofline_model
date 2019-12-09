@@ -11,6 +11,7 @@ from time import sleep
 from threading import Thread
 import os
 import json
+import signal
 
 
 class ReturnException(Exception):
@@ -176,7 +177,7 @@ class Perf:
             self.logger.info("File deleted")
             end = timer()
             os.system("pkill -2 perf")
-            perf.wait()
+            # perf.send_signal(signal.SIGINT)
             output = perf.stdout.read() + perf.stderr.read()
             self.logger.info(output)
             output = output.split("\n")
@@ -222,14 +223,17 @@ class Perf:
         poll = Thread(target=self.poll_output, args=(cmd,))
         poll.start()
         cmd_start_perf = ["perf", "stat", "-x", ";", "-I", str(self.interval), "-e",
-                          ",".join(self.counters), "-p", str(pid)]
+                          ",".join(self.counters), "-o", "perf_outfile", "-p", str(pid)]
         self.logger.info(" ".join(cmd_start_perf))
         perf = subprocess.Popen(cmd_start_perf, stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE)
         cmd.wait()
-        perf_out = perf.stdout.read() + perf.stderr.read()
-        perf.kill()
-        perf_out = [line.strip() for line in perf_out.split("\n") if line.strip()]
+        perf.send_signal(signal.SIGINT)
+        perf_out = open("perf_outfile", "r").read()
+        # perf_out = perf.stdout.read() + perf.stderr.read()
+
+        perf_out = [line.strip() for line in perf_out.split("\n")
+                    if line.strip() and line.strip()[0] != "#"]
 
         for counter in self.counters:
             self.contious_result[counter] = []
