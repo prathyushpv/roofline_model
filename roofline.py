@@ -6,12 +6,12 @@ import matplotlib.ticker as ticker
 import logging
 from perf import run_command
 from perf import Perf
-import json 
+import json
 from logger import create_logger
 from datetime import datetime
 
-# https://stackoverflow.com/questions/21920233/matplotlib-log-scale-tick-label-number-formatting
 
+# https://stackoverflow.com/questions/21920233/matplotlib-log-scale-tick-label-number-formatting
 class Roofline:
     def __init__(self, peak_flops, peak_bandwidth):
         self.peak_flops = peak_flops
@@ -30,7 +30,6 @@ class Roofline:
         self.ax = fig.add_subplot(1, 1, 1)
         self.ax.set_yscale('log', basey=2)
         self.ax.set_xscale('log', basex=2)
-        
 
         self.ax.axis([0.25, 4000, 0.5, 128])
         for axis in [self.ax.xaxis, self.ax.yaxis]:
@@ -38,32 +37,32 @@ class Roofline:
             formatter.set_scientific(False)
             axis.set_major_formatter(formatter)
 
-
         self.ax.yaxis.grid()
-        self.ax.plot([self.peak_flops/self.peak_bandwidth, 4000],[self.peak_flops, self.peak_flops], color='red', lw=2)
+        self.ax.plot([self.peak_flops / self.peak_bandwidth, 4000], [self.peak_flops, self.peak_flops], color='red',
+                     lw=2)
         # TODO Memory line correction
-        self.ax.plot([0, self.peak_flops/self.peak_bandwidth],[0, self.peak_flops], color='red', lw=2)
+        self.ax.plot([0, self.peak_flops / self.peak_bandwidth], [0, self.peak_flops], color='red', lw=2)
 
     def add_command(self, command, name):
-        self.commands.append({"command":command, "name":name})
+        self.commands.append({"command": command, "name": name})
 
     def add_prereq(self, command):
         self.prereqs.append(command)
 
     def run(self, phased=False):
-        counters = ['inst_retired.any', 
+        counters = ['inst_retired.any',
                     'instructions',
-                    'mem_inst_retired.all_loads', 
-                    'mem_inst_retired.all_stores', 
+                    'mem_inst_retired.all_loads',
+                    'mem_inst_retired.all_stores',
                     'L1-dcache-loads',
                     'L1-dcache-stores',
-                    'LLC-load-misses', 
+                    'LLC-load-misses',
                     'LLC-store-misses',
                     'fp_arith_inst_retired.128b_packed_double',
                     'fp_arith_inst_retired.128b_packed_single',
                     'fp_arith_inst_retired.256b_packed_double',
                     'fp_arith_inst_retired.256b_packed_single'
-                   ]
+                    ]
 
         for prereq in self.prereqs:
             self.logger.info("Running prereq %s" % prereq)
@@ -85,10 +84,8 @@ class Roofline:
             else:
                 result = p.run()
                 if result is not None:
-                   result["name"] = name
+                    result["name"] = name
                 self.data.append(result)
-
-            
 
     def add_data(self, filename):
         with open(filename) as fp:
@@ -96,57 +93,47 @@ class Roofline:
         self.logger.info("Got data " + json.dumps(self.data, indent=4))
 
     def dump_data(self):
-         filename = "data_%s.json" % datetime.now().strftime('%Y_%m_%d__%H_%M_%S')
-         with open(filename, "w") as fp:
-             json.dump(self.data, fp, indent=4)
+        filename = "data_%s.json" % datetime.now().strftime('%Y_%m_%d__%H_%M_%S')
+        with open(filename, "w") as fp:
+            json.dump(self.data, fp, indent=4)
 
     def plot_workloads(self):
         for workload in self.data:
             operations = workload["instructions"] - workload["L1-dcache-loads"] - workload["L1-dcache-stores"]
-            simd_operations =   workload["fp_arith_inst_retired.128b_packed_double"] * 2 + \
-                                workload["fp_arith_inst_retired.128b_packed_single"] * 4 + \
-                                workload["fp_arith_inst_retired.256b_packed_double"] * 4 + \
-                                workload["fp_arith_inst_retired.256b_packed_single"] * 8
-            non_simd_operations = operations -  workload["fp_arith_inst_retired.128b_packed_double"] - \
-                                                workload["fp_arith_inst_retired.128b_packed_single"] - \
-                                                workload["fp_arith_inst_retired.256b_packed_double"] - \
-                                                workload["fp_arith_inst_retired.256b_packed_single"]
+            simd_operations = workload["fp_arith_inst_retired.128b_packed_double"] * 2 + \
+                              workload["fp_arith_inst_retired.128b_packed_single"] * 4 + \
+                              workload["fp_arith_inst_retired.256b_packed_double"] * 4 + \
+                              workload["fp_arith_inst_retired.256b_packed_single"] * 8
+            non_simd_operations = operations - workload["fp_arith_inst_retired.128b_packed_double"] - \
+                                  workload["fp_arith_inst_retired.128b_packed_single"] - \
+                                  workload["fp_arith_inst_retired.256b_packed_double"] - \
+                                  workload["fp_arith_inst_retired.256b_packed_single"]
 
             effective_operations = simd_operations + non_simd_operations
 
-                              
             data_transfer = (workload["LLC-load-misses"] + workload["LLC-store-misses"]) * 64
             workload["effective_operations"] = effective_operations
-            print workload["inst_retired.any"]
-            print workload["L1-dcache-loads"]
-            print workload["L1-dcache-stores"]
-            print "\n"
-            print simd_operations
-            print operations
-            print effective_operations
             workload["operational_intensity"] = float(effective_operations) / float(data_transfer)
-            workload["gflops"] = (effective_operations / workload["time"])/1000000000
+            workload["gflops"] = (effective_operations / workload["time"]) / 1000000000
         for workload in self.data:
             name = workload["name"]
-            print (name, workload["operational_intensity"], workload["gflops"])
+            print(name, workload["operational_intensity"], workload["gflops"])
             self.ax.plot(workload["operational_intensity"], workload["gflops"], "bo")
             self.ax.annotate(name, (workload["operational_intensity"], workload["gflops"]))
-
-
 
     def show(self):
         plt.show()
 
+
 if __name__ == "__main__":
     logger = create_logger()
     r = Roofline(64, 15)
-    #r.add_data("data3.json")
-    #r.add_command("/home/prathyushpv/work/High_Performance_GEMM/mmm", "mmm")
-    #r.run()
-    #r.plot_workloads()
-    #r.dump_data()
-    #r.show()
-    r.add_command("python test.py", "test")
+    r.add_data("data4.json")
+    # r.add_command("/home/prathyushpv/work/High_Performance_GEMM/mmm", "mmm")
+    # r.run()
+    r.plot_workloads()
+    # r.dump_data()
+    r.show()
+    # r.add_command("python test.py", "test")
     r.run(True)
     r.dump_data()
-
