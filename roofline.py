@@ -58,6 +58,7 @@ class Roofline:
                     'L1-dcache-stores',
                     'LLC-load-misses',
                     'LLC-store-misses',
+                    'cycles',
                     'fp_arith_inst_retired.128b_packed_double',
                     'fp_arith_inst_retired.128b_packed_single',
                     'fp_arith_inst_retired.256b_packed_double',
@@ -115,6 +116,7 @@ class Roofline:
             workload["effective_operations"] = effective_operations
             workload["operational_intensity"] = float(effective_operations) / float(data_transfer)
             workload["gflops"] = (effective_operations / workload["time"]) / 1000000000
+            workload["ipc"] = float(workload["instructions"]) / float(workload["cycle"])
         for workload in self.data:
             name = workload["name"]
             print(name, workload["operational_intensity"], workload["gflops"])
@@ -128,7 +130,7 @@ class Roofline:
 if __name__ == "__main__":
     logger = create_logger()
     r = Roofline(64, 15)
-    r.add_data("data4.json")
+    r.add_data("data5.json")
     # r.add_command("/home/prathyushpv/work/High_Performance_GEMM/mmm", "mmm")
     # r.run()
     r.plot_workloads()
